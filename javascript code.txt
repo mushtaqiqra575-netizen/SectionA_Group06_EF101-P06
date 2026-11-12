@@ -1,0 +1,109 @@
+// LocalStorage key
+const STORAGE_KEY = 'urlAnalytics';
+
+function getData() {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+}
+
+function saveData(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function generateCode() {
+    return Math.random().toString(36).substring(2, 7);
+}
+
+function getShortUrl(code) {
+    return window.location.href.split('#')[0] + '#' + code;
+}
+
+function shortenUrl() {
+    const input = document.getElementById('longUrlInput');
+    const url = input.value.trim();
+
+    if (!url) {
+        alert('Please enter a valid URL');
+        return;
+    }
+
+    const code = generateCode();
+    const shortUrl = getShortUrl(code);
+
+    const newItem = {
+        code: code,
+        shortUrl: shortUrl,
+        originalUrl: url,
+        clicks: 0,
+        lastClicked: 'Never',
+        device: 'None'
+    };
+
+    const data = getData();
+    data.unshift(newItem); // Add new entry to the top
+    saveData(data);
+
+    // Show result box
+    document.getElementById('resultBox').classList.remove('hidden');
+    document.getElementById('shortLinkDisplay').href = shortUrl;
+    document.getElementById('shortLinkDisplay').innerText = shortUrl;
+
+    input.value = '';
+    renderTable();
+}
+
+function getDeviceType() {
+    const ua = navigator.userAgent;
+    if (/mobile/i.test(ua)) return 'Mobile';
+    if (/ipad|tablet/i.test(ua)) return 'Tablet';
+    return 'Desktop';
+}
+
+function handleRedirect(code) {
+    const data = getData();
+    const item = data.find(i => i.code === code);
+    if (item) {
+        item.clicks += 1;
+        item.lastClicked = new Date().toLocaleString();
+        item.device = getDeviceType();
+        saveData(data);
+        renderTable();
+        window.open(item.originalUrl, '_blank');
+    }
+}
+
+function renderTable() {
+    const tbody = document.getElementById('analyticsTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const data = getData();
+    data.forEach(item => {
+        const tr = document.createElement('tr');
+        const fullUrl = getShortUrl(item.code);
+        tr.innerHTML = `
+            <td class="p-3 font-mono font-bold text-gray-800">${item.code}</td>
+            <td class="p-3"><a href="#" onclick="handleRedirect('${item.code}'); return false;" class="text-blue-600 font-bold underline">${fullUrl}</a></td>
+            <td class="p-3 max-w-xs truncate">${item.originalUrl}</td>
+            <td class="p-3">${item.clicks}</td>
+            <td class="p-3">${item.lastClicked}</td>
+            <td class="p-3">${item.device}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function copyToClipboard() {
+    const display = document.getElementById('shortLinkDisplay');
+    navigator.clipboard.writeText(display.href);
+    alert('Short URL copied to clipboard!');
+}
+
+// Load table data when page opens
+window.onload = function() {
+    const hash = window.location.hash.substring(1);
+    if (hash) {
+        handleRedirect(hash);
+    }
+    renderTable();
+};
